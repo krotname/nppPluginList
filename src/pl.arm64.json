@@ -171,6 +171,16 @@
 			"homepage": "https://github.com/thosrtanner/notepad-pp-linter"
 		},
 		{
+			"folder-name": "MarkdownTableEditor",
+			"display-name": "Markdown Table Editor",
+			"version": "11.0.1",
+			"id": "65d537fb89e3f91777c0158a12e0b26f95845e499cefd8fac8f8d0bac44260fd",
+			"repository": "https://github.com/krotname/NppMarkdownTableEditor/releases/download/v11.0.1/MarkdownTableEditor-11.0.1-arm64-pluginadmin.zip",
+			"description": "Format, align, sort, resize, and convert Markdown tables directly in Notepad++.",
+			"author": "krotname",
+			"homepage": "https://github.com/krotname/NppMarkdownTableEditor"
+		},
+		{
 			"folder-name": "MenuIcons",
 			"display-name": "MenuIcons",
 			"version": "2.0.7",

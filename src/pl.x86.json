@@ -858,6 +858,16 @@
 			"homepage": "https://github.com/mohzy83/NppMarkdownPanel"
 		},
 		{
+			"folder-name": "MarkdownTableEditor",
+			"display-name": "Markdown Table Editor",
+			"version": "11.0.1",
+			"id": "673fce2f435a8f6f9ddbc2118a30201e290df2faf051d666f07bc68204c3997c",
+			"repository": "https://github.com/krotname/NppMarkdownTableEditor/releases/download/v11.0.1/MarkdownTableEditor-11.0.1-x86-pluginadmin.zip",
+			"description": "Format, align, sort, resize, and convert Markdown tables directly in Notepad++.",
+			"author": "krotname",
+			"homepage": "https://github.com/krotname/NppMarkdownTableEditor"
+		},
+		{
 			"folder-name": "MarkdownViewerPlusPlus",
 			"display-name": "MarkdownViewer++",
 			"version": "0.8.2",
