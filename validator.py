@@ -14,6 +14,7 @@ from win32api import GetFileVersionInfo, LOWORD, HIWORD, error as win32api_error
 
 api_url = os.environ.get('APPVEYOR_API_URL')
 has_error = False
+REQUEST_TIMEOUT_SECONDS = 30
 
 # Constants for creating the plugin list overview
 C_LINE_BREAK = '\x0d'
@@ -50,7 +51,7 @@ def post_error(message):
     }
 
     if api_url:
-        requests.post(api_url + "api/build/messages", json=message)
+        requests.post(api_url + "api/build/messages", json=message, timeout=REQUEST_TIMEOUT_SECONDS)
     else:
         from pprint import pprint
         pprint(message)
@@ -135,7 +136,7 @@ def unique_json_keys_check(plugin, displaynames, foldernames, repositories):
        if plugin["display-name"] == name :
            post_error(f'{plugin["display-name"]}: non unique display-name entry')
            found = True
-    if found == False:
+    if not found:
            displaynames.append(plugin["display-name"])
 
     found = False
@@ -143,7 +144,7 @@ def unique_json_keys_check(plugin, displaynames, foldernames, repositories):
        if plugin["folder-name"] == folder :
            post_error(f'{plugin["folder-name"]}: non unique folder-name entry')
            found = True
-    if found == False:
+    if not found:
        foldernames.append(plugin["folder-name"])
 
     found = False
@@ -151,7 +152,7 @@ def unique_json_keys_check(plugin, displaynames, foldernames, repositories):
        if plugin["repository"] == repo :
            post_error(f'{plugin["repository"]}: non unique repository entry')
            found = True
-    if found == False:
+    if not found:
        repositories.append(plugin["repository"])
 
 
@@ -201,7 +202,7 @@ def parse(filename):
             print(f' *** {"; ".join(compatibility_messages)} ***')
 
         try:
-            response = requests.get(unquote_url(plugin["repository"]))
+            response = requests.get(unquote_url(plugin["repository"]), timeout=REQUEST_TIMEOUT_SECONDS)
         except requests.exceptions.RequestException as e:
             post_error(f'{plugin["display-name"]}: {str(e)}')
             continue
@@ -218,26 +219,25 @@ def parse(filename):
 
         # Ensure it is a valid zip file
         try:
-            zip = zipfile.ZipFile(io.BytesIO(response.content))
-        except zipfile.BadZipFile as e:
+            with zipfile.ZipFile(io.BytesIO(response.content)) as plugin_zip:
+                # The expected DLL name
+                dll_name = f'{plugin["folder-name"]}.dll'.lower()
+
+                # While Notepad++ is not case-sensitive, extracting files from the zip file is, so we convert
+                # both the expected file name and the extracted file names to lowercase for accurate matching
+                for file in plugin_zip.namelist():
+                    if dll_name == file.lower():
+                        dll_name = file
+                        break
+                else:
+                    post_error(f'{plugin["display-name"]}: Zip file does not contain {plugin["folder-name"]}.dll.')
+                    continue
+
+                with plugin_zip.open(dll_name) as dll_file, open("./" + provided_architecture + "/" + dll_name, 'wb') as f:
+                    f.write(dll_file.read())
+        except zipfile.BadZipFile:
             post_error(f'{plugin["display-name"]}: Invalid zip file.')
             continue
-
-        # The expected DLL name
-        dll_name = f'{plugin["folder-name"]}.dll'.lower()
-
-        # While Notepad++ is not case-sensitive, extracting files from the zip file is, so we convert
-        # both the expected file name and the extracted file names to lowercase for accurate matching
-        for file in zip.namelist():
-            if dll_name == file.lower():
-                dll_name = file
-                break
-        else:
-            post_error(f'{plugin["display-name"]}: Zip file does not contain {plugin["folder-name"]}.dll.')
-            continue
-
-        with zip.open(dll_name) as dll_file, open("./" + provided_architecture + "/" + dll_name, 'wb') as f:
-            f.write(dll_file.read())
 
         version = plugin["version"]
 
@@ -269,9 +269,9 @@ ARCHITECTURE_FILENAMES_MAPPING = {
 ARCHITECTURE_OPTIONS = ", ".join(ARCHITECTURE_FILENAMES_MAPPING.keys())
 ARCHITECTURE_OPTIONS = f"{ARCHITECTURE_OPTIONS.rpartition(',')[0]}, or{ARCHITECTURE_OPTIONS.rpartition(',')[-1]}"
 if len(sys.argv) > 1:
-    provided_architecture = sys.argv[1].lower()
+    provided_architecture = sys.argv[1].strip().lower()
 else:
-    provided_architecture = input(f'Please provide the target architecture ({ARCHITECTURE_OPTIONS}): ').lower()
+    provided_architecture = input(f'Please provide the target architecture ({ARCHITECTURE_OPTIONS}): ').strip().lower()
 if provided_architecture in ARCHITECTURE_FILENAMES_MAPPING:
     json_file, output_file = ARCHITECTURE_FILENAMES_MAPPING[provided_architecture]
 elif provided_architecture == "all_md":
@@ -284,7 +284,8 @@ elif provided_architecture == "all_md":
     else:
         sys.exit()
 else:
-    json_file, output_file = ARCHITECTURE_FILENAMES_MAPPING['x86']
+    post_error(f'Unknown architecture: {provided_architecture}. Expected {ARCHITECTURE_OPTIONS}, or all_md.')
+    sys.exit(-2)
 print(f'Provided architecture: {provided_architecture}.')
 parse(json_file)
 with open(output_file, "w", encoding='utf-8') as md_file:

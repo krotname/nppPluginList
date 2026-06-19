@@ -2,14 +2,13 @@ name: CI_build
 
 on: [push, pull_request]
 
+permissions:
+  contents: read
+
 jobs:
   build:
 
     runs-on: windows-latest
-
-    permissions:
-      # Give the default GITHUB_TOKEN write permission to commit and push the changed files back to the repository.
-      contents: write
 
     strategy:
       fail-fast: false
@@ -19,11 +18,13 @@ jobs:
 
     steps:
     - name: Checkout repo
-      uses: actions/checkout@v6
+      uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+      with:
+        persist-credentials: false
 
     - name: Install python modules
       working-directory: .
-      run: pip3 install -r requirements.txt
+      run: pip3 install --require-hashes -r requirements.lock
 
     - name: check used package versions
       working-directory: .
@@ -34,7 +35,7 @@ jobs:
       run: python validator.py ${{ matrix.build_platform }}
 
     - name: Add msbuild to PATH
-      uses: microsoft/setup-msbuild@v3
+      uses: microsoft/setup-msbuild@30375c66a4eea26614e0d39710365f22f8b0af57 # v3
 
     - name: MSBuild of plugin dll
       working-directory: vcxproj
@@ -42,7 +43,7 @@ jobs:
 
     - name: Archive artifacts for x64
       if: matrix.build_platform == 'x64' && matrix.build_configuration == 'Release'
-      uses: actions/upload-artifact@v7
+      uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
       with:
           name: plugin_dll_and_list_x64
           path: |
@@ -51,7 +52,7 @@ jobs:
 
     - name: Archive artifacts for Win32
       if: matrix.build_platform == 'Win32' && matrix.build_configuration == 'Release'
-      uses: actions/upload-artifact@v7
+      uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
       with:
           name: plugin_dll_and_list_x86
           path: |
@@ -60,26 +61,39 @@ jobs:
 
     - name: Archive artifacts for ARM64
       if: matrix.build_platform == 'ARM64' && matrix.build_configuration == 'Release'
-      uses: actions/upload-artifact@v7
+      uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
       with:
           name: plugin_dll_and_list_arm64
           path: |
                 binarm64\nppPluginList.dll
                 doc\plugin_list_arm64.md
 
-    - name: Checkout main branch if push trigger is a tag
-      if: github.repository_owner == 'notepad-plus-plus' && github.ref_type == 'tag' && matrix.build_platform == 'ARM64' && matrix.build_configuration == 'Release'
-      run: |
-           git fetch --all
-           git checkout master
+  update-plugin-lists:
+
+    runs-on: windows-latest
+    if: github.repository_owner == 'notepad-plus-plus' && github.ref_type == 'tag'
+
+    permissions:
+      contents: write
+
+    steps:
+    - name: Checkout repo
+      uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+      with:
+        fetch-depth: 0
+
+    - name: Install python modules
+      working-directory: .
+      run: pip3 install --require-hashes -r requirements.lock
+
+    - name: Checkout main branch
+      run: git checkout master
 
     - name: Generate all plugin lists markdown from json on tagging
-      if: startsWith(github.ref, 'refs/tags/') && matrix.build_platform == 'ARM64' && matrix.build_configuration == 'Release'
       working-directory: .
       run: python validator.py all_md
 
     - name: Push markdown changes on tagging
-      if: startsWith(github.ref, 'refs/tags/') && matrix.build_platform == 'ARM64' && matrix.build_configuration == 'Release'
-      uses: stefanzweifel/git-auto-commit-action@v7
+      uses: stefanzweifel/git-auto-commit-action@04702edda442b2e678b25b537cec683a1493fcb9 # v7
       with:
         file_pattern: 'doc/*.md'
