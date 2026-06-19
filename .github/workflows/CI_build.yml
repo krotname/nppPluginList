@@ -8,13 +8,21 @@ permissions:
 jobs:
   build:
 
-    runs-on: windows-latest
+    runs-on: windows-2022
 
     strategy:
       fail-fast: false
       matrix:
-        build_configuration: [Release]
-        build_platform: [x64, Win32, arm64]
+        include:
+          - build_configuration: Release
+            build_platform: x64
+            validator_arch: x64
+          - build_configuration: Release
+            build_platform: Win32
+            validator_arch: x86
+          - build_configuration: Release
+            build_platform: ARM64
+            validator_arch: arm64
 
     steps:
     - name: Checkout repo
@@ -32,7 +40,18 @@ jobs:
 
     - name: Validate json
       working-directory: .
-      run: python validator.py ${{ matrix.build_platform }}
+      shell: pwsh
+      run: |
+        for ($attempt = 1; $attempt -le 3; $attempt++) {
+          python validator.py ${{ matrix.validator_arch }}
+          if ($LASTEXITCODE -eq 0) {
+            exit 0
+          }
+          if ($attempt -lt 3) {
+            Start-Sleep -Seconds (15 * $attempt)
+          }
+        }
+        exit 1
 
     - name: Add msbuild to PATH
       uses: microsoft/setup-msbuild@30375c66a4eea26614e0d39710365f22f8b0af57 # v3
